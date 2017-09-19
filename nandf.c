@@ -16,18 +16,39 @@ struct nand {
   int           size; // insts in program
   struct inst*  prog; // program
 };
-// len(vals) = argc + size + 1 (the result)
 
 // partial eval from given program index
-int eval(struct nand in, int *vals, int start) {
-  for (int i = start; i < in.size; i++) {
-    int a = in.prog[i].a;
-    int b = in.prog[i].b;
-    vals[in.argc + i] = !(vals[a] && vals[b]);
+// macro on the size of the program
+#define EVAL(SIZE) \
+  int __eval##SIZE(struct nand in, int *vals, int start) { \
+    for (int i = start; i < SIZE; i++) { \
+      int a = in.prog[i].a; \
+      int b = in.prog[i].b; \
+      vals[in.argc + i] = !(vals[a] && vals[b]); \
+    } \
+    return vals[in.argc + SIZE - 1]; \
   }
 
-  return vals[in.argc + in.size - 1];
-}
+EVAL(1)
+EVAL(2)
+EVAL(3)
+EVAL(4)
+EVAL(5)
+EVAL(6)
+EVAL(7)
+EVAL(8)
+
+int (*evals[9])(struct nand in, int *vals, int start) = {
+  NULL,
+  __eval1,
+  __eval2,
+  __eval3,
+  __eval4,
+  __eval5,
+  __eval6,
+  __eval7,
+  __eval8
+};
 
 // compute next nand program
 // argc is fixed
@@ -56,6 +77,7 @@ int next(struct nand *prev) {
   prev->prog = (struct inst*) realloc(prev->prog, sizeof(struct inst) * prev->size);
   prev->prog[prev->size - 1] = (struct inst) { .a = 0, .b = 0 };
 
+  // signal prog size increased
   return -1;
 }
 
@@ -108,7 +130,7 @@ int main(int argc, char *argv[]) {
 
       int from = valid[i];
       valid[i] = goal.size;
-      if ((x ^ y ^ z) != eval(goal, ctxs[i], from)) {
+      if ((x ^ y ^ z) != evals[goal.size](goal, ctxs[i], from)) {
         goto next_prog;
       }
     }
