@@ -24,7 +24,7 @@ struct nand {
   case x: \
     a = in.prog[x].a; \
     b = in.prog[x].b; \
-    vals[ARGC + x] = !(vals[a] && vals[b]);
+    vals[ARGC + x] = ~(vals[a] & vals[b]);
 
 #define EVAL(size, core) \
   int __eval##size(struct nand in, int *vals, int start) { \
@@ -105,6 +105,7 @@ void print_nand(struct nand *p) {
 
 int main(int argc, char *argv[]) {
   // it's wired to brute force a xor
+  // we are checking all three-bit inputs
 
   // initialize test prog
   struct nand goal = (struct nand) { .argc = ARGC, .size = 1, .prog = NULL };
@@ -119,56 +120,49 @@ int main(int argc, char *argv[]) {
     total += accum;
   }
 
-  // we are checking all three-bit inputs
-  int *ctxs[8]; // maintain 8 partial evaluation contexts for program
-  int valid[8]; // this context is valid up to which inst?
-  for (int i = 0; i < 8; i++) {
-    ctxs[i] = malloc(sizeof(int) * (goal.argc + goal.size));
-
-    // input init
-    ctxs[i][0] = (i & 0x1);
-    ctxs[i][1] = (i & 0x2) >> 1;
-    ctxs[i][2] = (i & 0x4) >> 2;
-
-    valid[i] = 0;
+  // we maintain a single partial evaluation context
+  // data corresponding to different inputs is bitpacked:
+  //                    data0   data1   data2   data3
+  // input 0 - vals[0]  0       0       0       0
+  // input 1 - vals[1]  0       0       1       1       ...
+  // input 2 - vals[2]  0       1       0       1
+  int *vals = malloc(sizeof(int) * (goal.argc + goal.size));
+  for (int i = 0; i < goal.argc + goal.size; i++) {
+    vals[i] = 0;
   }
+
+  // we also bitpack the correct output
+  int correct = 0;
+
+  // start packin'
+  for (int i = 0; i < 8; i++) {
+    int x = (i & 0x1);
+    int y = (i & 0x2) >> 1;
+    int z = (i & 0x4) >> 2;
+
+    vals[0] |= x << i;
+    vals[1] |= y << i;
+    vals[2] |= z << i;
+
+    correct |= (x ^ y ^ z) << i;
+  }
+
+  int valid = 0; // the context is valid up to which inst?
 
   // main program check loop
   unsigned long long checked = 0;
-  int next_valid;
   while (goal.size != LENGTH + 1) {
-    for (int i = 0; i < 8; i++) {
-      int x = (i & 0x1);
-      int y = (i & 0x2) >> 1;
-      int z = (i & 0x4) >> 2;
-
-      int from = valid[i];
-      valid[i] = goal.size;
-      if ((x ^ y ^ z) != evals[goal.size](goal, ctxs[i], from)) {
-        goto next_prog;
-      }
+    if (correct == evals[goal.size](goal, vals, valid)) {
+      print_nand(&goal);
+      break;
     }
 
-    print_nand(&goal);
-    break;
-
-next_prog:
-    next_valid = next(&goal);
+    valid = next(&goal);
 
     // realloc when prog size increased
-    if (next_valid == -1) {
-      next_valid = 0;
-
-      for (int i = 0; i < 8; i++) {
-        ctxs[i] = realloc(ctxs[i], sizeof(int) * (goal.argc + goal.size));
-      }
-    }
-
-    // invalidate contexts
-    for (int i = 0; i < 8; i++) {
-      if (valid[i] > next_valid) {
-        valid[i] = next_valid;
-      }
+    if (valid == -1) {
+      valid = 0;
+      vals = realloc(vals, sizeof(int) * (goal.argc + goal.size));
     }
 
     checked++;
