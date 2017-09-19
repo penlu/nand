@@ -4,6 +4,7 @@
 #include <time.h>
 
 // brute force nand programs up to...
+#define ARGC 3
 #define LENGTH 8
 
 struct inst {
@@ -19,24 +20,37 @@ struct nand {
 
 // partial eval from given program index
 // macro on the size of the program
-#define EVAL(SIZE) \
-  int __eval##SIZE(struct nand in, int *vals, int start) { \
-    for (int i = start; i < SIZE; i++) { \
-      int a = in.prog[i].a; \
-      int b = in.prog[i].b; \
-      vals[in.argc + i] = !(vals[a] && vals[b]); \
+#define STAGE(x) \
+  case x: \
+    a = in.prog[x].a; \
+    b = in.prog[x].b; \
+    vals[ARGC + x] = !(vals[a] && vals[b]);
+
+#define EVAL(size, core) \
+  int __eval##size(struct nand in, int *vals, int start) { \
+    int a, b; \
+    switch (start) { \
+      core \
     } \
-    return vals[in.argc + SIZE - 1]; \
+    return vals[ARGC + size - 1]; \
   }
 
-EVAL(1)
-EVAL(2)
-EVAL(3)
-EVAL(4)
-EVAL(5)
-EVAL(6)
-EVAL(7)
-EVAL(8)
+#define STAGE1 STAGE(0)
+EVAL(1, STAGE1)
+#define STAGE2 STAGE1 STAGE(1)
+EVAL(2, STAGE2)
+#define STAGE3 STAGE2 STAGE(2)
+EVAL(3, STAGE3)
+#define STAGE4 STAGE3 STAGE(3)
+EVAL(4, STAGE4)
+#define STAGE5 STAGE4 STAGE(4)
+EVAL(5, STAGE5)
+#define STAGE6 STAGE5 STAGE(5)
+EVAL(6, STAGE6)
+#define STAGE7 STAGE6 STAGE(6)
+EVAL(7, STAGE7)
+#define STAGE8 STAGE7 STAGE(7)
+EVAL(8, STAGE8)
 
 int (*evals[9])(struct nand in, int *vals, int start) = {
   NULL,
@@ -93,7 +107,7 @@ int main(int argc, char *argv[]) {
   // it's wired to brute force a xor
 
   // initialize test prog
-  struct nand goal = (struct nand) { .argc = 3, .size = 1, .prog = NULL };
+  struct nand goal = (struct nand) { .argc = ARGC, .size = 1, .prog = NULL };
   goal.prog = (struct inst*) malloc(sizeof(struct inst) * 1);
   goal.prog[0] = (struct inst) { .a = 0, .b = 0 };
 
