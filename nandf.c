@@ -91,7 +91,7 @@ int next(struct nand *prev) {
     // inc inst arg 2
     prev->prog[i].a = prev->prog[i].b + 1;
     prev->prog[i].b++;
-    if (prev->prog[i].b < prev->argc + i) {
+    if (__builtin_expect(prev->prog[i].b < prev->argc + i, 1)) {
       return i;
     }
 
@@ -118,14 +118,14 @@ void print_nand(struct nand *p) {
 
 int main(int argc, char *argv[]) {
   // it's wired to brute force a xor
-  // we are checking all three-bit inputs
+  // we are checking all four-bit inputs
 
   // initialize test prog
   struct nand goal = (struct nand) { .argc = ARGC, .size = 1, .prog = NULL };
   goal.prog = (struct inst*) malloc(sizeof(struct inst) * 1);
   goal.prog[0] = (struct inst) { .a = 0, .b = 0 };
 
-  // calculate total number of 3-arg programs up to size 8
+  // calculate total number of 4-arg programs up to size 16
   unsigned long long total = 0;
   unsigned long long accum = 1;
   for (int i = 0; i < LENGTH; i++) {
@@ -168,22 +168,24 @@ int main(int argc, char *argv[]) {
   unsigned long long checked = 0;
   int (*cur_eval)(struct nand, int*, int) = evals[goal.size];
   while (goal.size != LENGTH + 1) {
-    if (correct == cur_eval(goal, vals, valid)) {
+    // check bitpacked outputs
+    if (__builtin_expect(correct == cur_eval(goal, vals, valid), 0)) {
       print_nand(&goal);
       break;
     }
 
+    // advance to next program
     valid = next(&goal);
 
     // realloc when prog size increased
-    if (valid == -1) {
+    if (__builtin_expect(valid == -1, 0)) {
       valid = 0;
       vals = realloc(vals, sizeof(int) * (goal.argc + goal.size));
       cur_eval = evals[goal.size];
     }
 
     checked++;
-    if (checked % 100000000 == 0) {
+    if (__builtin_expect(checked % 100000000 == 0, 0)) {
       printf("checked: %llu of < %llu\n", checked, total);
       printf("rate:    %llu\n", checked / clock());
     }
