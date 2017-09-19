@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <time.h>
+
 // brute force nand programs
 
 struct inst {
@@ -49,12 +51,13 @@ void next(struct nand *prev) {
     }
 
     // inc inst arg 2
-    prev->prog[i].a = 0;
+    prev->prog[i].a = prev->prog[i].b + 1;
     prev->prog[i].b++;
     if (prev->prog[i].b < prev->argc + i) {
       return;
     }
 
+    prev->prog[i].a = 0;
     prev->prog[i].b = 0;
   }
 
@@ -68,39 +71,44 @@ void print_nand(struct nand *p) {
   printf("argc: %d\n", p->argc);
   printf("size: %d\n", p->size);
   for (int i = 0; i < p->size; i++) {
-    printf("var %d: %d nand %d\n", i + p->argc, p->prog[i].a, p->prog[i].b);
+    printf("var %d: %d nand %d\n", i + p->argc, p->prog[i].b, p->prog[i].a);
   }
 }
 
 int main(int argc, char *argv[]) {
   // it's wired to brute force a xor
-  
-  struct nand goal = (struct nand) { .argc = 2, .size = 1, .prog = NULL };
+
+  struct nand goal = (struct nand) { .argc = 3, .size = 1, .prog = NULL };
   goal.prog = (struct inst*) malloc(sizeof(struct inst) * 1);
   goal.prog[0] = (struct inst) { .a = 0, .b = 0 };
 
-  int i = 0;
-  while (goal.size != 5) {
-    int in[2] = {0, 0};
-    int r1 = eval(&goal, in);
-    in[1] = 1;
-    int r2 = eval(&goal, in);
-    in[0] = 1;
-    int r3 = eval(&goal, in);
-    in[1] = 0;
-    int r4 = eval(&goal, in);
+  unsigned long long i = 0;
+  while (goal.size != 10) {
+    // checking all three-bit inputs
+    for (int in = 0; in < 8; in++) {
+      int x = (in & 0x1);
+      int y = (in & 0x2) >> 1;
+      int z = (in & 0x4) >> 2;
 
-    if (!r1 && r2 && !r3 && r4) {
-      print_nand(&goal);
+      int put[3] = {x, y, z};
+      if ((x ^ y ^ z) != eval(&goal, put)) {
+        goto next_prog;
+      }
     }
 
+    print_nand(&goal);
+    break;
+
+next_prog:
     next(&goal);
 
     i++;
     if (i % 1000000 == 0) {
-      printf("%d\n", i);
+      printf("checked: %llu\n", i);
     }
   }
 
-  printf("%d\n", i);
+  printf("checked: %llu\n", i);
+  printf("in time: %ld\n", clock());
+  printf("check/s: %llu\n", i / clock());
 }
