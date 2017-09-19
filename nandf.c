@@ -4,8 +4,8 @@
 #include <time.h>
 
 // brute force nand programs up to...
-#define ARGC 3
-#define LENGTH 8
+#define ARGC 4
+#define LENGTH 12
 
 struct inst {
   int a;
@@ -24,15 +24,16 @@ struct nand {
   case x: \
     a = in.prog[x].a; \
     b = in.prog[x].b; \
-    vals[ARGC + x] = ~(vals[a] & vals[b]);
+    valr[x] = ~(vals[a] & vals[b]);
 
 #define EVAL(size, core) \
   int __eval##size(struct nand in, int *vals, int start) { \
     int a, b; \
+    int *valr = vals + ARGC; \
     switch (start) { \
       core \
     } \
-    return vals[ARGC + size - 1]; \
+    return valr[size - 1]; \
   }
 
 #define STAGE1 STAGE(0)
@@ -51,8 +52,16 @@ EVAL(6, STAGE6)
 EVAL(7, STAGE7)
 #define STAGE8 STAGE7 STAGE(7)
 EVAL(8, STAGE8)
+#define STAGE9 STAGE8 STAGE(8)
+EVAL(9, STAGE9)
+#define STAGE10 STAGE9 STAGE(9)
+EVAL(10, STAGE10)
+#define STAGE11 STAGE10 STAGE(10)
+EVAL(11, STAGE11)
+#define STAGE12 STAGE11 STAGE(11)
+EVAL(12, STAGE12)
 
-int (*evals[9])(struct nand in, int *vals, int start) = {
+int (*evals[13])(struct nand, int*, int) = {
   NULL,
   __eval1,
   __eval2,
@@ -61,7 +70,11 @@ int (*evals[9])(struct nand in, int *vals, int start) = {
   __eval5,
   __eval6,
   __eval7,
-  __eval8
+  __eval8,
+  __eval9,
+  __eval10,
+  __eval11,
+  __eval12
 };
 
 // compute next nand program
@@ -135,24 +148,27 @@ int main(int argc, char *argv[]) {
   int correct = 0;
 
   // start packin'
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 16; i++) {
     int x = (i & 0x1);
     int y = (i & 0x2) >> 1;
     int z = (i & 0x4) >> 2;
+    int w = (i & 0x8) >> 3;
 
     vals[0] |= x << i;
     vals[1] |= y << i;
     vals[2] |= z << i;
+    vals[3] |= w << i;
 
-    correct |= (x ^ y ^ z) << i;
+    correct |= (x ^ y ^ z ^ w) << i;
   }
 
   int valid = 0; // the context is valid up to which inst?
 
   // main program check loop
   unsigned long long checked = 0;
+  int (*cur_eval)(struct nand, int*, int) = evals[goal.size];
   while (goal.size != LENGTH + 1) {
-    if (correct == evals[goal.size](goal, vals, valid)) {
+    if (correct == cur_eval(goal, vals, valid)) {
       print_nand(&goal);
       break;
     }
@@ -163,6 +179,7 @@ int main(int argc, char *argv[]) {
     if (valid == -1) {
       valid = 0;
       vals = realloc(vals, sizeof(int) * (goal.argc + goal.size));
+      cur_eval = evals[goal.size];
     }
 
     checked++;
