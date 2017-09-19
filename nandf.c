@@ -95,9 +95,9 @@ int main(int argc, char *argv[]) {
       int y = (i & 0x2) >> 1;
       int z = (i & 0x4) >> 2;
 
-      int upto = valid[i];
+      int from = valid[i];
       valid[i] = goal.size;
-      if ((x ^ y ^ z) != eval(goal, ctxs[i], upto)) {
+      if ((x ^ y ^ z) != eval(goal, ctxs[i], from)) {
         goto next_prog;
       }
     }
@@ -125,8 +125,9 @@ next_prog:
     }
 
     checked++;
-    if (checked % 1000000 == 0) {
+    if (checked % 100000000 == 0) {
       printf("checked: %llu\n", checked);
+      printf("rate:    %llu\n", checked / clock());
     }
   }
 
