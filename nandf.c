@@ -7,6 +7,7 @@
 #define ARGC 4
 #define LENGTH 12
 
+
 struct inst {
   int a;
   int b;
@@ -18,9 +19,9 @@ struct nand {
   struct inst*  prog; // program
 };
 
+
 // partial eval from given program index
-// macro on the size of the program
-#define STAGE(x) \
+#define EVAL_STAGE(x) \
   case x: \
     a = in.prog[x].a; \
     b = in.prog[x].b; \
@@ -36,46 +37,40 @@ struct nand {
     return valr[size - 1]; \
   }
 
-#define STAGE1 STAGE(0)
-EVAL(1, STAGE1)
-#define STAGE2 STAGE1 STAGE(1)
-EVAL(2, STAGE2)
-#define STAGE3 STAGE2 STAGE(2)
-EVAL(3, STAGE3)
-#define STAGE4 STAGE3 STAGE(3)
-EVAL(4, STAGE4)
-#define STAGE5 STAGE4 STAGE(4)
-EVAL(5, STAGE5)
-#define STAGE6 STAGE5 STAGE(5)
-EVAL(6, STAGE6)
-#define STAGE7 STAGE6 STAGE(6)
-EVAL(7, STAGE7)
-#define STAGE8 STAGE7 STAGE(7)
-EVAL(8, STAGE8)
-#define STAGE9 STAGE8 STAGE(8)
-EVAL(9, STAGE9)
-#define STAGE10 STAGE9 STAGE(9)
-EVAL(10, STAGE10)
-#define STAGE11 STAGE10 STAGE(10)
-EVAL(11, STAGE11)
-#define STAGE12 STAGE11 STAGE(11)
-EVAL(12, STAGE12)
+// macros define eval for each possible size of the program
+#define EVAL_STAGE1 EVAL_STAGE(0)
+#define EVAL_STAGE2 EVAL_STAGE1 EVAL_STAGE(1)
+#define EVAL_STAGE3 EVAL_STAGE2 EVAL_STAGE(2)
+#define EVAL_STAGE4 EVAL_STAGE3 EVAL_STAGE(3)
+#define EVAL_STAGE5 EVAL_STAGE4 EVAL_STAGE(4)
+#define EVAL_STAGE6 EVAL_STAGE5 EVAL_STAGE(5)
+#define EVAL_STAGE7 EVAL_STAGE6 EVAL_STAGE(6)
+#define EVAL_STAGE8 EVAL_STAGE7 EVAL_STAGE(7)
+#define EVAL_STAGE9 EVAL_STAGE8 EVAL_STAGE(8)
+#define EVAL_STAGE10 EVAL_STAGE9 EVAL_STAGE(9)
+#define EVAL_STAGE11 EVAL_STAGE10 EVAL_STAGE(10)
+#define EVAL_STAGE12 EVAL_STAGE11 EVAL_STAGE(11)
+EVAL(1, EVAL_STAGE1)
+EVAL(2, EVAL_STAGE2)
+EVAL(3, EVAL_STAGE3)
+EVAL(4, EVAL_STAGE4)
+EVAL(5, EVAL_STAGE5)
+EVAL(6, EVAL_STAGE6)
+EVAL(7, EVAL_STAGE7)
+EVAL(8, EVAL_STAGE8)
+EVAL(9, EVAL_STAGE9)
+EVAL(10, EVAL_STAGE10)
+EVAL(11, EVAL_STAGE11)
+EVAL(12, EVAL_STAGE12)
 
+// size-based eval function table
 int (*evals[13])(struct nand, int*, int) = {
-  NULL,
-  __eval1,
-  __eval2,
-  __eval3,
-  __eval4,
-  __eval5,
-  __eval6,
-  __eval7,
-  __eval8,
-  __eval9,
-  __eval10,
-  __eval11,
+  NULL,     __eval1,  __eval2,  __eval3,
+  __eval4,  __eval5,  __eval6,  __eval7,
+  __eval8,  __eval9,  __eval10, __eval11,
   __eval12
 };
+
 
 // compute next nand program
 // argc is fixed
