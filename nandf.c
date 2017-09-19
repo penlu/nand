@@ -3,7 +3,8 @@
 
 #include <time.h>
 
-// brute force nand programs
+// brute force nand programs up to...
+#define LENGTH 8
 
 struct inst {
   int a;
@@ -69,13 +70,22 @@ void print_nand(struct nand *p) {
 int main(int argc, char *argv[]) {
   // it's wired to brute force a xor
 
+  // initialize test prog
   struct nand goal = (struct nand) { .argc = 3, .size = 1, .prog = NULL };
   goal.prog = (struct inst*) malloc(sizeof(struct inst) * 1);
   goal.prog[0] = (struct inst) { .a = 0, .b = 0 };
 
-  // checking all three-bit inputs
+  // calculate total number of 3-arg programs up to size 8
+  unsigned long long total = 0;
+  unsigned long long accum = 1;
+  for (int i = 0; i < LENGTH; i++) {
+    accum *= (i + goal.argc) * (i + goal.argc);
+    total += accum;
+  }
+
+  // we are checking all three-bit inputs
   int *ctxs[8]; // maintain 8 partial evaluation contexts for program
-  int valid[8]; // context is valid up to which inst?
+  int valid[8]; // this context is valid up to which inst?
   for (int i = 0; i < 8; i++) {
     ctxs[i] = malloc(sizeof(int) * (goal.argc + goal.size));
 
@@ -87,9 +97,10 @@ int main(int argc, char *argv[]) {
     valid[i] = 0;
   }
 
+  // main program check loop
   unsigned long long checked = 0;
   int next_valid;
-  while (goal.size != 10) {
+  while (goal.size != LENGTH + 1) {
     for (int i = 0; i < 8; i++) {
       int x = (i & 0x1);
       int y = (i & 0x2) >> 1;
@@ -126,12 +137,12 @@ next_prog:
 
     checked++;
     if (checked % 100000000 == 0) {
-      printf("checked: %llu\n", checked);
+      printf("checked: %llu of < %llu\n", checked, total);
       printf("rate:    %llu\n", checked / clock());
     }
   }
 
-  printf("checked: %llu\n", checked);
+  printf("checked: %llu of < %llu\n", checked, total);
   printf("in time: %ld\n", clock());
   printf("check/ms: %llu\n", checked / clock());
 }
