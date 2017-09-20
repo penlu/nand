@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
   int correct = 0;
 
   // start packin'
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 16; i++) {
     int x = (i & 0x1);
     int y = (i & 0x2) >> 1;
     int z = (i & 0x4) >> 2;
@@ -154,7 +154,7 @@ int main(int argc, char *argv[]) {
   // main program check loop
   unsigned long long checked = 0;
   int (*cur_eval)(struct nand, int*, int) = evals[goal.size];
-  while (goal.size != LENGTH + 1) {
+  while (__builtin_expect(goal.size != LENGTH + 1, 1)) {
     // check bitpacked outputs
     if (__builtin_expect(correct == cur_eval(goal, vals, valid), 0)) {
       print_nand(&goal);
@@ -181,9 +181,11 @@ int main(int argc, char *argv[]) {
     pinst[0] = 0;
 
 finish:
-    for (int i = valid; i < goal.size - 1; i++) {
-      pinst[i + 1] = pinst[i] + 1;
-      goal.prog[i] = next_inst[pinst[i]];
+    if (__builtin_expect(valid != goal.size - 1, 0)) {
+      for (int i = valid; i < goal.size - 1; i++) {
+        pinst[i + 1] = pinst[i] + 1;
+        goal.prog[i] = next_inst[pinst[i]];
+      }
     }
     goal.prog[goal.size - 1] = next_inst[pinst[goal.size - 1]];
 
