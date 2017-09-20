@@ -72,36 +72,10 @@ int (*evals[13])(struct nand, int*, int) = {
 };
 
 
-// compute next nand program
-// argc is fixed
-// return the lowest prog index changed
-int next(struct nand *prev) {
-  for (int i = prev->size - 1; i >= 0; i--) {
-    // inc inst arg 1
-    prev->prog[i].a++;
-    if (prev->prog[i].a < prev->argc + i) {
-      return i;
-    }
-
-    // inc inst arg 2
-    prev->prog[i].a = prev->prog[i].b + 1;
-    prev->prog[i].b++;
-    if (__builtin_expect(prev->prog[i].b < prev->argc + i, 1)) {
-      return i;
-    }
-
-    prev->prog[i].a = 0;
-    prev->prog[i].b = 0;
-  }
-
-  // we have to increase the size
-  prev->size++;
-  prev->prog = (struct inst*) realloc(prev->prog, sizeof(struct inst) * prev->size);
-  prev->prog[prev->size - 1] = (struct inst) { .a = 0, .b = 0 };
-
-  // signal prog size increased
-  return -1;
-}
+// lookup table for next instruction
+struct inst next_inst[(ARGC + LENGTH - 1) * (ARGC + LENGTH - 1) / 2 + \
+                      (ARGC + LENGTH) / 2];
+int max_inst[LENGTH];
 
 void print_nand(struct nand *p) {
   printf("argc: %d\n", p->argc);
@@ -115,18 +89,36 @@ int main(int argc, char *argv[]) {
   // it's wired to brute force a xor
   // we are checking all four-bit inputs
 
-  // initialize test prog
-  struct nand goal = (struct nand) { .argc = ARGC, .size = 1, .prog = NULL };
-  goal.prog = (struct inst*) malloc(sizeof(struct inst) * 1);
-  goal.prog[0] = (struct inst) { .a = 0, .b = 0 };
-
   // calculate total number of 4-arg programs up to size 16
   unsigned long long total = 0;
   unsigned long long accum = 1;
   for (int i = 0; i < LENGTH; i++) {
-    accum *= (i + goal.argc) * (i + goal.argc);
+    accum *= (i + ARGC) * (i + ARGC);
     total += accum;
   }
+
+  // initialize test prog
+  struct nand goal = (struct nand) { .argc = ARGC, .size = 1, .prog = NULL };
+  goal.prog = malloc(sizeof(struct inst) * goal.size);
+  goal.prog[0] = (struct inst) { .a = 0, .b = 0 };
+
+
+  // initialize lookup tables for next inst
+  int a = 0;
+  for (int i = 0; i < ARGC + LENGTH - 1; i++) {
+    for (int j = 0; j <= i; j++) {
+      next_inst[a++] = (struct inst) { .a = i, .b = j };
+    }
+  }
+  for (int i = 0; i < LENGTH; i++) {
+    max_inst[i] = (i + ARGC) * (i + ARGC) / 2 + (i + ARGC + 1)/2;
+  }
+
+  // initialize next inst lookup vector
+  int *pinst = malloc(sizeof(int) * (goal.size + 1));
+  pinst[0] = 0;
+  pinst[1] = 0;
+
 
   // we maintain a single partial evaluation context
   // data corresponding to different inputs is bitpacked:
@@ -135,7 +127,7 @@ int main(int argc, char *argv[]) {
   // input 1 - vals[1]  0       0       1       1       ...
   // input 2 - vals[2]  0       1       0       1
   int *vals = malloc(sizeof(int) * (goal.argc + goal.size));
-  for (int i = 0; i < goal.argc + goal.size; i++) {
+  for (int i = 0; i < goal.argc; i++) {
     vals[i] = 0;
   }
 
@@ -143,7 +135,7 @@ int main(int argc, char *argv[]) {
   int correct = 0;
 
   // start packin'
-  for (int i = 0; i < 16; i++) {
+  for (int i = 0; i < 8; i++) {
     int x = (i & 0x1);
     int y = (i & 0x2) >> 1;
     int z = (i & 0x4) >> 2;
@@ -159,6 +151,7 @@ int main(int argc, char *argv[]) {
 
   int valid = 0; // the context is valid up to which inst?
 
+
   // main program check loop
   unsigned long long checked = 0;
   int (*cur_eval)(struct nand, int*, int) = evals[goal.size];
@@ -169,14 +162,30 @@ int main(int argc, char *argv[]) {
       break;
     }
 
-    // advance to next program
-    valid = next(&goal);
+    // compute next nand program
+    for (valid = goal.size - 1; valid != -1; valid--) {
+      if (__builtin_expect(pinst[valid + 1]++ == max_inst[valid], 0)) {
+        pinst[valid + 1] = pinst[valid];
+        goal.prog[valid] = next_inst[pinst[valid + 1]];
+      } else {
+        goal.prog[valid] = next_inst[pinst[valid + 1]];
+        break;
+      }
+    }
 
-    // realloc when prog size increased
+    // we have to increase the size
     if (__builtin_expect(valid == -1, 0)) {
-      valid = 0;
+      goal.size++;
+
+      goal.prog = realloc(goal.prog, sizeof(struct inst) * goal.size);
+      goal.prog[goal.size - 1] = (struct inst) { .a = 0, .b = 0 };
+      pinst = realloc(pinst, sizeof(int) * (goal.size + 1));
+      pinst[goal.size] = 0;
+
       vals = realloc(vals, sizeof(int) * (goal.argc + goal.size));
       cur_eval = evals[goal.size];
+
+      valid = 0;
     }
 
     checked++;
