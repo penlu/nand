@@ -105,9 +105,9 @@ int main(int argc, char *argv[]) {
 
   // initialize lookup tables for next inst
   int a = 0;
-  for (int i = 0; i < ARGC + LENGTH - 1; i++) {
+  for (int i = 0; i < ARGC + LENGTH; i++) {
     for (int j = 0; j <= i; j++) {
-      next_inst[a++] = (struct inst) { .a = i, .b = j };
+      next_inst[a++] = (struct inst) { .b = i, .a = j };
     }
   }
   for (int i = 0; i < LENGTH; i++) {
@@ -115,9 +115,8 @@ int main(int argc, char *argv[]) {
   }
 
   // initialize next inst lookup vector
-  int *pinst = malloc(sizeof(int) * (goal.size + 1));
+  int *pinst = malloc(sizeof(int) * goal.size);
   pinst[0] = 0;
-  pinst[1] = 0;
 
 
   // we maintain a single partial evaluation context
@@ -163,33 +162,34 @@ int main(int argc, char *argv[]) {
     }
 
     // compute next nand program
-    for (valid = goal.size - 1; valid != -1; valid--) {
-      if (__builtin_expect(pinst[valid + 1]++ == max_inst[valid], 0)) {
-        pinst[valid + 1] = pinst[valid];
-        goal.prog[valid] = next_inst[pinst[valid + 1]];
-      } else {
-        goal.prog[valid] = next_inst[pinst[valid + 1]];
-        break;
+    for (valid = goal.size - 1; valid >= 0; valid--) {
+      pinst[valid]++;
+      if (__builtin_expect(pinst[valid] != max_inst[valid], 1)) {
+        goto finish;
       }
     }
 
     // we have to increase the size
-    if (__builtin_expect(valid == -1, 0)) {
-      goal.size++;
+    goal.size++;
 
-      goal.prog = realloc(goal.prog, sizeof(struct inst) * goal.size);
-      goal.prog[goal.size - 1] = (struct inst) { .a = 0, .b = 0 };
-      pinst = realloc(pinst, sizeof(int) * (goal.size + 1));
-      pinst[goal.size] = 0;
+    goal.prog = realloc(goal.prog, sizeof(struct inst) * goal.size);
+    pinst = realloc(pinst, sizeof(int) * goal.size);
+    vals = realloc(vals, sizeof(int) * (goal.argc + goal.size));
+    cur_eval = evals[goal.size];
 
-      vals = realloc(vals, sizeof(int) * (goal.argc + goal.size));
-      cur_eval = evals[goal.size];
+    valid = 0;
+    pinst[0] = 0;
 
-      valid = 0;
+finish:
+    for (int i = valid; i < goal.size - 1; i++) {
+      pinst[i + 1] = pinst[i] + 1;
+      goal.prog[i] = next_inst[pinst[i]];
     }
+    goal.prog[goal.size - 1] = next_inst[pinst[goal.size - 1]];
 
     checked++;
     if (__builtin_expect(checked % 100000000 == 0, 0)) {
+      printf("size:    %d\n", goal.size);
       printf("checked: %llu of < %llu\n", checked, total);
       printf("rate:    %llu\n", checked / clock());
     }
