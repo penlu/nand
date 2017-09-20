@@ -72,26 +72,38 @@ int (*evals[13])(struct nand, int*, int) = {
 };
 
 
+#define NEXT_STAGE(x) \
+  case x: \
+    prev->prog[x].a++; \
+    if (prev->prog[x].a < prev->argc + x) { \
+      return x; \
+    } \
+    prev->prog[x].a = prev->prog[x].b + 1; \
+    prev->prog[x].b++; \
+    if (__builtin_expect(prev->prog[x].b < prev->argc + x, 1)) { \
+      return x; \
+    } \
+    prev->prog[x].a = 0; \
+    prev->prog[x].b = 0; \
+
 // compute next nand program
 // argc is fixed
 // return the lowest prog index changed
 int next(struct nand *prev) {
-  for (int i = prev->size - 1; i >= 0; i--) {
-    // inc inst arg 1
-    prev->prog[i].a++;
-    if (prev -> prog[i].a < prev->argc + i) {
-      return i;
-    }
-
-    // inc inst arg 2
-    prev->prog[i].a = prev->prog[i].b + 1;
-    prev->prog[i].b++;
-    if (__builtin_expect(prev->prog[i].b < prev->argc + i, 1)) {
-      return i;
-    }
-
-    prev->prog[i].a = 0;
-    prev->prog[i].b = 0;
+  switch (prev->size - 1) {
+    NEXT_STAGE(12);
+    NEXT_STAGE(11);
+    NEXT_STAGE(10);
+    NEXT_STAGE(9);
+    NEXT_STAGE(8);
+    NEXT_STAGE(7);
+    NEXT_STAGE(6);
+    NEXT_STAGE(5);
+    NEXT_STAGE(4);
+    NEXT_STAGE(3);
+    NEXT_STAGE(2);
+    NEXT_STAGE(1);
+    NEXT_STAGE(0);
   }
 
   // we have to increase the size
