@@ -79,7 +79,7 @@ int next(struct nand *prev) {
   for (int i = prev->size - 1; i >= 0; i--) {
     // inc inst arg 1
     prev->prog[i].a++;
-    if (prev -> prog[i].a < prev->argc + i) {
+    if (prev->prog[i].a < prev->argc + i) {
       return i;
     }
 
