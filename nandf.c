@@ -99,24 +99,24 @@ int main(int argc, char *argv[]) {
 
   // main program check loop
   unsigned long long checked = 0;
-  int next_valid;
+  int next_valid = 0;
   while (goal.size != LENGTH + 1) {
+    int ok = 1;
     for (int i = 0; i < 8; i++) {
       int x = (i & 0x1);
       int y = (i & 0x2) >> 1;
       int z = (i & 0x4) >> 2;
 
-      int from = valid[i];
-      valid[i] = goal.size;
-      if ((x ^ y ^ z) != eval(goal, ctxs[i], from)) {
-        goto next_prog;
+      if ((x ^ y ^ z) != eval(goal, ctxs[i], next_valid)) {
+        ok = 0;
       }
     }
 
-    print_nand(&goal);
-    break;
+    if (ok) {
+      print_nand(&goal);
+      break;
+    }
 
-next_prog:
     next_valid = next(&goal);
 
     // realloc when prog size increased
@@ -125,13 +125,6 @@ next_prog:
 
       for (int i = 0; i < 8; i++) {
         ctxs[i] = realloc(ctxs[i], sizeof(int) * (goal.argc + goal.size));
-      }
-    }
-
-    // invalidate contexts
-    for (int i = 0; i < 8; i++) {
-      if (valid[i] > next_valid) {
-        valid[i] = next_valid;
       }
     }
 
